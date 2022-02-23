@@ -2,10 +2,11 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using Jumplosion.Scripts.Enums;
 
-namespace Jumplosion.Scripts
+namespace Jumplosion.Scripts.Player
 {
-    [RequireComponent(typeof(Ragdoll), typeof(CharacterController), typeof(Animator))]
+    [RequireComponent(typeof(Ragdoll), typeof(CharacterController), typeof(AnimationController))]
     public class PlayerController : MonoBehaviour
     {
         [SerializeField] private CharacterController _characterController;
@@ -22,11 +23,13 @@ namespace Jumplosion.Scripts
         private bool _readyToShoot = false;
         private Ragdoll _ragdoll;
         private InputManager _inputManager;
+        private AnimationController _animationController;
 
         private void Awake()
         {
             _inputManager = InputManager.Instance;
             _ragdoll = GetComponent<Ragdoll>();
+            _animationController = GetComponent<AnimationController>();
 
         }
         private void Start()
@@ -46,7 +49,7 @@ namespace Jumplosion.Scripts
             {
                 Move_target();
                 if (_target.activeInHierarchy) _target.SetActive(false);
-                ShootProjectile(_projectile.ProjectileGameObject);
+                ShootProjectile(PoolObjectType.Rocket);
             };
 
             _inputManager.TouchBegan += TouchBegan;
@@ -66,23 +69,31 @@ namespace Jumplosion.Scripts
 
         private void Move_target()
         {
-            if (_inputManager.TouchedUI || _cameraToggle.isOn || !_characterController.enabled)
-            { _target.SetActive(false); _readyToShoot = false; return; }
             Vector3 _targetPosition = _inputManager.GetTouchWorldPosition(_inputManager.ActiveTouchPosition);
+            if (_inputManager.TouchedUI || _cameraToggle.isOn || !_characterController.enabled)
+            {
+                _target.SetActive(false);
+                _readyToShoot = false;
+                _animationController.EnableAiming(false);
+                  return;
+            }
             transform.LookAt(new Vector3(_targetPosition.x, transform.position.y, _targetPosition.z));
             _target.transform.position = _targetPosition;
             _target.transform.localScale = Vector3.one * 2 * _projectile.ExplosionRadius;
             _targetCenter.localScale = Vector3.one * 2 * _targetCenterRadius / _target.transform.localScale.x;
             if (!_target.activeInHierarchy) _target.SetActive(true);
+            _animationController.EnableAiming(true);
             _readyToShoot = true;
         }
 
-        public void ShootProjectile(GameObject _projectile)
+        public void ShootProjectile(PoolObjectType projectileType)
         {
             if (!_readyToShoot) return;
-            GameObject newProjectile = Instantiate(_projectile, _shootPoint.position, _shootPoint.rotation);
+            GameObject newProjectile = ObjectPooler.Instance.Spawn(projectileType);
+            newProjectile.transform.position = _shootPoint.position;
             newProjectile.transform.LookAt(_target.transform.position);
             _readyToShoot = false;
+            _animationController.EnableAiming(false);
         }
     }
 }
